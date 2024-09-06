@@ -482,7 +482,7 @@ class AccountService {
             name: 1,
             qq: 1,
             followersCount: 1,
-            lastUpdate: 1,
+            lastUpdateTime: 1,
           }
         }).toArray()
         for (var i in myFollow) {
