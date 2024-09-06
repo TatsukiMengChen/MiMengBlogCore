@@ -209,7 +209,7 @@ connectToDatabase()
   })
   .catch((_) => console.error('Error connecting to MongoDB'))
 
-app.get('/account', async (req: Request, res: Response) => {
+app.get('/user', async (req: Request, res: Response) => {
   const errorMessage = validateParams(req, accountActionParams)
   if (errorMessage) {
     return res.status(400).send(errorMessage)
@@ -393,7 +393,7 @@ app.get('/content', async (req: Request, res: Response) => {
         )
         res.json(recommendArticles)
         break
-      case 'getnotice':
+      case 'getNotice':
         const notice = await Content.getNotice()
         res.json(notice)
         break

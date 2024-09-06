@@ -13,17 +13,17 @@ class ContentServices {
   }
 
   async getRecommendedArticles(page: number, size: number) {
-    const articles = await this.cl.findOne({ type: 'recommendedArticles' })
+    const articles = await this.cl.findOne({ type: 'recommendedArticles' }, { projection: { _id: 0 } })
     return articles.content
   }
 
   async getNotice() {
-    const notice = await this.cl.findOne({ type: 'notice' })
-    return notice.content
+    const notice = await this.cl.findOne({ type: 'notice' }, { projection: { _id: 0 } })
+    return notice
   }
 
   async getAD() {
-    const ad = await this.cl.findOne({ type: 'ad' })
+    const ad = await this.cl.findOne({ type: 'ad' }, { projection: { _id: 0 } })
     return ad.content
   }
 }

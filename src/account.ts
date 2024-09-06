@@ -136,15 +136,15 @@ class AccountService {
         const account = await this.cl.findOne({ id: id, password: password }, {
           projection: {
             id: 1,
-            password: 1,
             token: 1,
+            password: 1,
             qq: 1,
             name: 1,
+            admin: 1,
             registerDate: 1,
             signInDate: 1,
-            miniuid: 1,
-            integral: 1,
             followersCount: 1,
+            articlesCount: 1,
             profile: 1,
             vipDate: 1,
           },
