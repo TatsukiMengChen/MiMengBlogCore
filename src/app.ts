@@ -53,6 +53,7 @@ type AccountActionParams = {
     result: any
   }
   getInfo: { id: string }
+  getMyFollow: { id: string }
   follow: { id: string; target: string }
   unfollow: { id: string; target: string }
 }
@@ -64,6 +65,7 @@ const accountActionParams: {
   login: ['id', 'password', 'result'],
   register: ['id', 'password', 'qq', 'name', 'result'],
   getInfo: ['id'],
+  getMyFollow: ['id'],
   follow: ['id', 'target'],
   unfollow: ['id', 'target'],
 }
@@ -266,6 +268,15 @@ app.get('/user', async (req: Request, res: Response) => {
           res.json(accountInfo)
         } else {
           res.status(404).send('Account not found')
+        }
+        break
+      case 'getMyFollow':
+        var token = await getToken(req)
+        if (token.ret) {
+          const followed = await Account.getMyFollow(req.query.id as string)
+          if (followed) {
+            res.json(followed)
+          }
         }
         break
       case 'follow':

@@ -468,11 +468,43 @@ class AccountService {
     }
   }
 
+  async getMyFollow(id: string): Promise<any> {
+    const result = await this.cl.findOne(
+      { id: id },
+      { projection: { _id: 0, myFollow: 1 } },
+    )
+    if (result) {
+      if (result.myFollow) {
+        const myFollow = await this.cl.find({ id: { $in: result.myFollow } }, {
+          projection: {
+            _id: 0,
+            id: 1,
+            name: 1,
+            qq: 1,
+            followersCount: 1,
+            lastUpdate: 1,
+          }
+        }).toArray()
+        for (var i in myFollow) {
+          myFollow[i].head = `https://q1.qlogo.cn/g?b=qq&nk=${myFollow[i].qq}&s=100`
+          myFollow[i].qq = undefined
+        }
+        return myFollow
+      } else {
+        return []
+      }
+    } else {
+      return []
+    }
+  }
+
   async follow(id: string, target: string): Promise<any> {
     const newFollower = {
       id: id,
       date: Date.now(),
     }
+
+    //检测是否已经关注
     const checkFollowInfo = await this.cl.findOne(
       {
         'id': target,
@@ -484,6 +516,21 @@ class AccountService {
     )
 
     if (!checkFollowInfo) {
+      //添加目标到我的关注列表
+      const r = await this.cl.updateOne(
+        { id: id },
+        {
+          $push: {
+            myFollow: target,
+          },
+        }
+      )
+      if (r.matchedCount === 0) {
+        throw new Error(
+          'No account found with the provided ID or failed to update.',
+        )
+      }
+      //更新关注列表和关注人数
       const result = await this.cl.updateOne(
         { id: target },
         {
