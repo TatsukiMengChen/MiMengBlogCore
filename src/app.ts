@@ -273,7 +273,6 @@ app.get('/user', async (req: Request, res: Response) => {
         if (token.ret) {
           const followed = await Account.follow(
             req.query.id as string,
-            token.token,
             req.query.target as string,
           )
           if (followed) {
@@ -290,7 +289,6 @@ app.get('/user', async (req: Request, res: Response) => {
         if (token.ret) {
           const unfollowed = await Account.unfollow(
             req.query.id as string,
-            token.token,
             req.query.target as string,
           )
           if (unfollowed) {

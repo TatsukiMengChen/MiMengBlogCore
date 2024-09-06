@@ -468,106 +468,86 @@ class AccountService {
     }
   }
 
-  async follow(id: string, token: string, target: string): Promise<any> {
-    const account = await this.validateToken(id, token)
-    if (account) {
-      const newFollower = {
-        id: id,
-        date: Date.now(),
-      }
-      const checkFollowInfo = await this.cl.findOne(
+  async follow(id: string, target: string): Promise<any> {
+    const newFollower = {
+      id: id,
+      date: Date.now(),
+    }
+    const checkFollowInfo = await this.cl.findOne(
+      {
+        'id': target,
+        'followers.id': id,
+      },
+      {
+        projection: { _id: 0, followersCount: 1 },
+      },
+    )
+
+    if (!checkFollowInfo) {
+      const result = await this.cl.updateOne(
+        { id: target },
         {
-          'id': target,
-          'followers.id': id,
-        },
-        {
-          projection: { _id: 0, followersCount: 1 },
+          $push: {
+            followers: newFollower,
+          },
+          $inc: { followersCount: 1 }, // 增加followersCount
         },
       )
 
-      if (!checkFollowInfo) {
-        const result = await this.cl.updateOne(
-          { id: target },
-          {
-            $push: {
-              followers: newFollower,
-            },
-            $inc: { followersCount: 1 }, // 增加followersCount
-          },
+      if (result.matchedCount === 0) {
+        throw new Error(
+          'No account found with the provided ID or failed to update.',
         )
-
-        if (result.matchedCount === 0) {
-          throw new Error(
-            'No account found with the provided ID or failed to update.',
-          )
-        } else {
-          return {
-            code: 0,
-            msg: '关注成功',
-          }
-        }
       } else {
         return {
-          code: 1,
-          msg: '已关注',
+          code: 0,
+          msg: '关注成功',
         }
       }
     } else {
       return {
-        code: 2,
-        msg: 'token错误',
+        code: 1,
+        msg: '已关注',
       }
     }
   }
 
-  async unfollow(
-    accountId: string,
-    token: string,
-    targetId: string,
-  ): Promise<any> {
-    const account = await this.validateAccountToken(accountId, token)
-    if (account) {
-      const checkFollowInfo = await this.cl.findOne(
+  async unfollow(accountId: string, targetId: string,): Promise<any> {
+    const checkFollowInfo = await this.cl.findOne(
+      {
+        'id': targetId,
+        'followers.id': accountId,
+      },
+      {
+        projection: { _id: 0, followersCount: 1 },
+      },
+    )
+
+    if (checkFollowInfo) {
+      const result = await this.cl.updateOne(
+        { id: targetId },
         {
-          'id': targetId,
-          'followers.id': accountId,
-        },
-        {
-          projection: { _id: 0, followersCount: 1 },
+          $pull: {
+            followers: { id: accountId },
+          },
+          $inc: { followersCount: -1 }, // 减少followersCount
         },
       )
 
-      if (checkFollowInfo) {
-        const result = await this.cl.updateOne(
-          { id: targetId },
-          {
-            $pull: {
-              followers: { id: accountId },
-            },
-            $inc: { followersCount: -1 }, // 减少followersCount
-          },
+      if (result.matchedCount === 0) {
+        throw new Error(
+          'No account found with the provided ID or failed to update.',
         )
-
-        if (result.matchedCount === 0) {
-          throw new Error(
-            'No account found with the provided ID or failed to update.',
-          )
-        } else {
-          return {
-            code: 0,
-            msg: '取消关注成功',
-          }
-        }
       } else {
         return {
-          code: 1,
-          msg: '未关注',
+          code: 0,
+          msg: '取消关注成功',
         }
       }
     } else {
       return {
-        code: 2,
-        msg: 'Token错误',
+        code: 1,
+        msg: '未关注',
       }
     }
   }
