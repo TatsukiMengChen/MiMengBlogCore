@@ -12,9 +12,9 @@ class ContentServices {
     this.cl = db.collection('Content')
   }
 
-  async getRecommendedArticles(page: number, size: number) {
-    const articles = await this.cl.findOne({ type: 'recommendedArticles' }, { projection: { _id: 0 } })
-    return articles.content
+  async getRecommendedArticles() {
+    const articles = await this.cl.findOne({ type: 'recommendededArticles' }, { projection: { _id: 0 } })
+    return articles.articles
   }
 
   async getNotice() {

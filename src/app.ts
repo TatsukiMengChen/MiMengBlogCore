@@ -105,7 +105,7 @@ const searchActionParams: {
 }
 
 type ContentActionParams = {
-  getRecommendedArticles: { page: number }
+  getRecommendedArticles: {}
   getNotice: {}
   getAD: {}
 }
@@ -113,7 +113,7 @@ type ContentActionParams = {
 const contentActionParams: {
   [K in keyof ContentActionParams]: Array<keyof ContentActionParams[K]>
 } = {
-  getRecommendedArticles: ['page'],
+  getRecommendedArticles: [],
   getNotice: [],
   getAD: [],
 }
@@ -121,6 +121,7 @@ const contentActionParams: {
 type ArticleActionParams = {
   getContent: { id: number }
   getInfo: { id: number }
+  getArticles: { list: Array<number> }
   getComments: { id: number; page: number; sort: string }
   getCommentByID: { articleID: number; commentID: string }
   getReplies: {
@@ -136,6 +137,7 @@ const articleActionParams: {
 } = {
   getContent: ['id'],
   getInfo: ['id'],
+  getArticles: ['list'],
   getComments: ['id', 'page', 'sort'],
   getCommentByID: ['articleID', 'commentID'],
   getReplies: ['articleID', 'commentID', 'page', 'sort'],
@@ -396,11 +398,8 @@ app.get('/content', async (req: Request, res: Response) => {
     const { act } = req.query
     switch (act) {
       case 'getRecommendedArticles':
-        const recommendArticles = await Content.getRecommendedArticles(
-          Number(req.query.page),
-          10,
-        )
-        res.json(recommendArticles)
+        const recommendedArticles = await Content.getRecommendedArticles()
+        res.json(recommendedArticles)
         break
       case 'getNotice':
         const notice = await Content.getNotice()
@@ -435,6 +434,11 @@ app.get('/article', async (req: Request, res: Response) => {
       case 'getInfo':
         const info = await Article.getInfo(Number(req.query.id))
         res.json(info)
+        break
+      case 'getArticles':
+        const articleIds = JSON.parse(String(req.query.list));
+        const articles = await Article.getArticles(articleIds, 1, 10);
+        res.json(articles)
         break
       case 'getComments':
         const comments = await Article.getComments(

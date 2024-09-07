@@ -249,7 +249,7 @@ class AccountService {
     }
   }
 
-  async getInfo(id: string): Promise<AccountDocument | null> {
+  async getInfo(id: string): Promise<any | null> {
     const account = await this.cl.findOne({ id: id }, {
       projection: {
         id: 1,

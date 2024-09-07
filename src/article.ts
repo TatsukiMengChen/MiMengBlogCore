@@ -63,6 +63,7 @@ class ArticleServices {
       { id: id },
       {
         projection: {
+          _id: 0,
           id: 1,
           author: 1,
           publishDate: 1,
@@ -77,11 +78,57 @@ class ArticleServices {
           views: 1,
           likes: 1,
           comments: 1,
-          shares: 1,
+          stars: 1,
         },
       },
     )
-    return article
+    if (article) {
+      const author = await Account.getInfo(article.author)
+      if (author) {
+        article.head = `https://q1.qlogo.cn/g?b=qq&nk=${author.qq}&s=100`
+        article.name = author.name
+        article.isVIP = author.isVIP
+        return article
+      }
+    }
+  }
+
+  async getArticles(list: Array<number>, page: number, size: number) {
+    console.log(list, typeof list)
+    const articles = await this.a.find({ id: { $in: list } },
+      {
+        projection: {
+          _id: 0,
+          id: 1,
+          author: 1,
+          publishDate: 1,
+          updateDate: 1,
+          title: 1,
+          tags: 1,
+          official: 1,
+          selected: 1,
+          locked: 1,
+          outline: 1,
+          images: 1,
+          views: 1,
+          likes: 1,
+          comments: 1,
+          stars: 1,
+        },
+      },)
+      .skip((page - 1) * size)
+      .limit(size)
+      .toArray()
+
+    for (const article of articles) {
+      const author = await Account.getInfo(article.author)
+      if (author) {
+        article.head = `https://q1.qlogo.cn/g?b=qq&nk=${author.qq}&s=100`
+        article.name = author.name
+        article.isVIP = author.isVIP
+      }
+    }
+    return articles
   }
 
   async getComments(
