@@ -228,6 +228,7 @@ class AccountService {
               vipDate: null,
               miniuid: null,
               token: generateToken(),
+              myLike: [],
             })
             const account = await this.cl.findOne({
               _id: newAccount.insertedId,

@@ -522,8 +522,14 @@ app.get('/article', async (req: Request, res: Response) => {
     const { act } = req.query
     switch (act) {
       case 'getContent':
-        const content = await Article.getContent(Number(req.query.id))
-        res.json(content)
+        var token = await getToken(req)
+        if (token.ret) {
+          const content = await Article.getContent(Number(req.query.id), String(req.query.userID), token.token)
+          res.json(content)
+        } else {
+          const content = await Article.getContent(Number(req.query.id))
+          res.json(content)
+        }
         break
       case 'getInfo':
         const info = await Article.getInfo(Number(req.query.id))

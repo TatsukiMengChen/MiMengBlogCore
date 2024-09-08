@@ -28,7 +28,7 @@ class ArticleServices {
     this.cl = this.articles
   }
 
-  async getContent(id: number) {
+  async getContent(id: number, userID?: string, token?: string) {
     // 首先获取文章信息
     const article = await this.a.findOne(
       { id: id },
@@ -57,19 +57,27 @@ class ArticleServices {
     if (article) {
       // 更新文章的浏览次数
       this.a.updateOne({ id: id }, { $inc: { views: 1 } });
-
-      // 获取作者信息
-      const author = await Account.getInfo(article.author);
-      if (author) {
-        article.head = `https://q1.qlogo.cn/g?b=qq&nk=${author.qq}&s=100`;
-        article.name = author.name;
-      }
-
       this.tags.updateMany({ name: { $in: article.tags } }, { $inc: { views: 1 } });
 
-    }
+      if (userID && token) {
+        var likes = await Account.checkLikes(userID, token, [id])
+      }
 
-    return article;
+      console.log(likes)
+      if (likes) {
+        if (likes.includes(article.id)) {
+          article.liked = true
+        }
+      }
+
+      const author = await Account.getInfo(article.author)
+      if (author) {
+        article.head = `https://q1.qlogo.cn/g?b=qq&nk=${author.qq}&s=100`
+        article.name = author.name
+        article.isVIP = author.isVIP
+      }
+      return article;
+    }
   }
 
   async getInfo(id: number) {
