@@ -468,9 +468,57 @@ class AccountService {
     }
   }
 
-  async getMyFollow(id: string): Promise<any> {
-    const result = await this.cl.findOne(
+  async checkLikes(id: string, token: string, articles: Array<number>): Promise<any> {
+    const result = await this.cl.findOne({ id: id, token: token }, {
+      projection: {
+        _id: 0,
+        myLike: 1,
+      }
+    })
+    if (result) {
+      const myLike = result.myLike
+      const likes = []
+      for (var i in articles) {
+        if (myLike.includes(articles[i])) {
+          likes.push(articles[i])
+        }
+      }
+      return likes
+    }
+  }
+
+  async addLike(id: string, token: string, article: number): Promise<any> {
+    const result = await this.cl.updateOne(
       { id: id },
+      { $push: { myLike: article } },
+    )
+    if (result.matchedCount === 0) {
+      throw new Error(
+        'No account found with the provided ID or failed to update.',
+      )
+    } else {
+      return result
+    }
+  }
+
+  async removeLike(id: string, token: string, article: number): Promise<any> {
+    const result = await this.cl.updateOne(
+      { id: id },
+      { $pull: { myLike: article } },
+    )
+    if (result.matchedCount === 0) {
+      throw new Error(
+        'No account found with the provided ID or failed to update.',
+      )
+    }
+    else {
+      return result
+    }
+  }
+
+  async getMyFollow(id: string, token: string): Promise<any> {
+    const result = await this.cl.findOne(
+      { id: id, token: token },
       { projection: { _id: 0, myFollow: 1 } },
     )
     if (result) {
@@ -525,11 +573,6 @@ class AccountService {
           },
         }
       )
-      if (r.matchedCount === 0) {
-        throw new Error(
-          'No account found with the provided ID or failed to update.',
-        )
-      }
       //更新关注列表和关注人数
       const result = await this.cl.updateOne(
         { id: target },
@@ -571,6 +614,16 @@ class AccountService {
     )
 
     if (checkFollowInfo) {
+      //从我的关注列表中移除目标
+      const r = await this.cl.updateOne(
+        { id: accountId },
+        {
+          $pull: {
+            myFollow: targetId,
+          },
+        }
+      )
+      //更新关注列表和关注人数
       const result = await this.cl.updateOne(
         { id: targetId },
         {

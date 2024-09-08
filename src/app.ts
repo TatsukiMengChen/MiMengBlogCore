@@ -78,7 +78,7 @@ type SearchActionParams = {
     sort: string
     reverse: boolean
   }
-  searchArticle: {
+  searchArticles: {
     id: string
     keyword: string
     page: number
@@ -99,7 +99,7 @@ const searchActionParams: {
   [K in keyof SearchActionParams]: Array<keyof SearchActionParams[K]>
 } = {
   search: ['id', 'keyword', 'page', 'sort', 'reverse'],
-  searchArticle: ['id', 'keyword', 'page', 'sort', 'reverse'],
+  searchArticles: ['page', 'sort', 'reverse'],
   searchArticleByTag: ['id', 'keyword', 'page', 'sort', 'reverse'],
   searchUser: ['id', 'keyword', 'page'],
 }
@@ -108,6 +108,7 @@ type ContentActionParams = {
   getRecommendedArticles: {}
   getNotice: {}
   getAD: {}
+  getHotTags: {}
 }
 
 const contentActionParams: {
@@ -116,12 +117,14 @@ const contentActionParams: {
   getRecommendedArticles: [],
   getNotice: [],
   getAD: [],
+  getHotTags: [],
 }
 
 type ArticleActionParams = {
   getContent: { id: number }
   getInfo: { id: number }
   getArticles: { list: Array<number> }
+  modifyLike: { id: number; userID: string }
   getComments: { id: number; page: number; sort: string }
   getCommentByID: { articleID: number; commentID: string }
   getReplies: {
@@ -129,6 +132,14 @@ type ArticleActionParams = {
     commentID: string
     page: number
     sort: string
+  }
+  publishArticle: {
+    id: string
+    title: string
+    content: string
+    tags: Array<string>
+    outline: string
+    images: Array<string>
   }
 }
 
@@ -138,9 +149,11 @@ const articleActionParams: {
   getContent: ['id'],
   getInfo: ['id'],
   getArticles: ['list'],
+  modifyLike: ['id', 'userID'],
   getComments: ['id', 'page', 'sort'],
   getCommentByID: ['articleID', 'commentID'],
   getReplies: ['articleID', 'commentID', 'page', 'sort'],
+  publishArticle: ['id', 'title', 'content', 'tags', 'outline', 'images'],
 }
 
 // 参数验证函数
@@ -275,7 +288,7 @@ app.get('/user', async (req: Request, res: Response) => {
       case 'getMyFollow':
         var token = await getToken(req)
         if (token.ret) {
-          const followed = await Account.getMyFollow(req.query.id as string)
+          const followed = await Account.getMyFollow(req.query.id as string, token.token)
           if (followed) {
             res.json(followed)
           }
@@ -330,11 +343,13 @@ app.get('/search', async (req: Request, res: Response) => {
 
   try {
     const { act } = req.query
-    const account = await Account.findAccountByID(req.query.id as string)
-    if (account) {
-      var token = await getToken(req)
-      if (token.ret) {
-        if (account.token === token.token) {
+    //const account = await Account.findAccountByID(req.query.id as string)
+    if (true) {
+      //var token = await getToken(req)
+      //if (token.ret) {
+      if (true) {
+        //if (account.token === token.token) {
+        if (true) {
           switch (act) {
             case 'search':
               const search = await Search.search(
@@ -345,13 +360,28 @@ app.get('/search', async (req: Request, res: Response) => {
               )
               res.json(search)
               break
-            case 'searchArticle':
-              const articles = await Search.searchArticle(
-                req.query.keyword as string,
-                Number(req.query.page),
-                req.query.sort as string,
-                JSON.parse(req.query.reverse as string) as boolean,
-              )
+            case 'searchArticles':
+              var token = await getToken(req)
+              var articles
+              if (token.ret) {
+                articles = await Search.searchArticles(
+                  req.query.keyword as string,
+                  Number(req.query.page),
+                  10,
+                  req.query.sort as string,
+                  JSON.parse(req.query.reverse as string) as boolean,
+                  String(req.query.id),
+                  token.token
+                )
+              } else {
+                articles = await Search.searchArticles(
+                  req.query.keyword as string,
+                  Number(req.query.page),
+                  10,
+                  req.query.sort as string,
+                  JSON.parse(req.query.reverse as string) as boolean
+                )
+              }
               res.json(articles)
               break
             case 'searchArticleByTag':
@@ -379,7 +409,7 @@ app.get('/search', async (req: Request, res: Response) => {
             .send('Unauthorized: Invalid token or account not found')
         }
       } else {
-        res.status(401).send(token.message)
+        //res.status(401).send(token.message)
       }
     }
   } catch (error) {
@@ -409,6 +439,10 @@ app.get('/content', async (req: Request, res: Response) => {
         const ad = await Content.getAD()
         res.json(ad)
         break
+      case 'getHotTags':
+        const hotTags = await Content.getHotTags()
+        res.json(hotTags)
+        break
       default:
         res.status(400).send('Invalid action:' + act)
     }
@@ -437,8 +471,21 @@ app.get('/article', async (req: Request, res: Response) => {
         break
       case 'getArticles':
         const articleIds = JSON.parse(String(req.query.list));
-        const articles = await Article.getArticles(articleIds, 1, 10);
+        var token = await getToken(req)
+        var articles
+        if (token.ret) {
+          articles = await Article.getArticles(articleIds, 1, 10, String(req.query.userID), token.token);
+        } else {
+          articles = await Article.getArticles(articleIds, 1, 10);
+        }
         res.json(articles)
+        break
+      case 'modifyLike':
+        var token = await getToken(req)
+        if (token.ret) {
+          const like = await Article.modifyLike(Number(req.query.id), String(req.query.userID), token.token)
+          res.json(like)
+        }
         break
       case 'getComments':
         const comments = await Article.getComments(
@@ -465,6 +512,13 @@ app.get('/article', async (req: Request, res: Response) => {
           req.query.sort as string,
         )
         res.json(replies)
+        break
+      case 'publishArticle':
+        var token = await getToken(req)
+        if (token.ret) {
+          var result = await Article.publishArticle(req.query.id as string, token.token, req.query.title as string, req.query.content as string, JSON.parse(String(req.query.tags)), req.query.outline as string, JSON.parse(String(req.query.images)))
+          res.json(result)
+        }
         break
       default:
         res.status(400).send('Invalid action:' + act)

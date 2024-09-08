@@ -1,10 +1,11 @@
 import { Account } from './account'
-import { ObjectId } from 'mongodb'
+import { Code, ObjectId } from 'mongodb'
 
 class ArticleServices {
   private db: any
   public articles: any
   public comments: any
+  public tags: any
   public cl: any
   private a: any
   private c: any
@@ -13,6 +14,7 @@ class ArticleServices {
     this.db = null
     this.articles = null
     this.comments = null
+    this.tags = null
     this.cl = null
   }
 
@@ -20,12 +22,14 @@ class ArticleServices {
     this.db = db
     this.articles = db.collection('Article')
     this.comments = db.collection('Comment')
+    this.tags = db.collection('Tag')
     this.a = this.articles
     this.c = this.comments
     this.cl = this.articles
   }
 
   async getContent(id: number) {
+    // 首先获取文章信息
     const article = await this.a.findOne(
       { id: id },
       {
@@ -47,15 +51,24 @@ class ArticleServices {
           shares: 1,
         },
       },
-    )
+    );
+
     if (article) {
-      const author = await Account.getInfo(article.author)
+      // 更新文章的浏览次数
+      this.a.updateOne({ id: id }, { $inc: { views: 1 } });
+
+      // 获取作者信息
+      const author = await Account.getInfo(article.author);
       if (author) {
-        article.head = `https://q1.qlogo.cn/g?b=qq&nk=${author.qq}&s=100`
-        article.name = author.name
+        article.head = `https://q1.qlogo.cn/g?b=qq&nk=${author.qq}&s=100`;
+        article.name = author.name;
       }
+
+      this.tags.updateMany({ name: { $in: article.tags } }, { $inc: { views: 1 } });
+
     }
-    return article
+
+    return article;
   }
 
   async getInfo(id: number) {
@@ -93,8 +106,10 @@ class ArticleServices {
     }
   }
 
-  async getArticles(list: Array<number>, page: number, size: number) {
-    console.log(list, typeof list)
+  async getArticles(list: Array<number>, page: number, size: number, userID?: string, token?: string) {
+    if (userID && token) {
+      var likes = await Account.checkLikes(userID, token, list)
+    }
     const articles = await this.a.find({ id: { $in: list } },
       {
         projection: {
@@ -121,6 +136,11 @@ class ArticleServices {
       .toArray()
 
     for (const article of articles) {
+      if (likes) {
+        if (likes.includes(article.id)) {
+          article.liked = true
+        }
+      }
       const author = await Account.getInfo(article.author)
       if (author) {
         article.head = `https://q1.qlogo.cn/g?b=qq&nk=${author.qq}&s=100`
@@ -129,6 +149,73 @@ class ArticleServices {
       }
     }
     return articles
+  }
+
+  async modifyLike(id: number, userID: string, token: string) {
+    const vallid = await Account.validateToken(userID, token)
+    if (!vallid) {
+      return {
+        code: 2,
+        msg: 'token验证失败',
+      }
+    }
+    const checkLikeInfo = await this.cl.findOne(
+      {
+        'id': id,
+        'likeList.id': userID,
+      },
+      {
+        projection: { _id: 0, likes: 1 },
+      },
+    )
+
+    if (!checkLikeInfo) {
+      //更新喜欢列表和喜欢人数
+      const newPeople = { id: userID, date: Date.now() }
+      Account.addLike(userID, token, id)
+      const result = await this.cl.updateOne(
+        { id: id },
+        {
+          $push: {
+            likeList: newPeople,
+          },
+          $inc: { likes: 1 },
+        },
+      )
+
+      if (result.matchedCount === 0) {
+        throw new Error(
+          'No article found with the provided ID or failed to update.',
+        )
+      } else {
+        return {
+          code: 0,
+          msg: '添加喜欢成功',
+        }
+      }
+    } else {
+      Account.removeLike(userID, token, id)
+      const result = await this.cl.updateOne(
+        { id: id },
+        {
+          $pull: {
+            likeList: { id: userID },
+          },
+          $inc: { likes: -1 },
+        },
+      )
+
+      if (result.matchedCount === 0) {
+        throw new Error(
+          'No article found with the provided ID or failed to update.',
+        )
+      } else {
+        return {
+          code: 1,
+          msg: '取消喜欢成功',
+        }
+      }
+    }
   }
 
   async getComments(
@@ -211,6 +298,41 @@ class ArticleServices {
       throw error
     }
   }
+
+  async publishArticle(userID:string, token:string, title:string, content:string, tags:Array<string>, outline:string, images:Array<string>) {
+    var valid = await Account.validateToken(userID, token)
+    if (valid) {
+      //获取文章总数
+      const count = await this.cl.countDocuments()
+      const article = {
+        id: count + 1,
+        author: userID,
+        publishDate: new Date(),
+        updateDate: new Date(),
+        title: title,
+        content: content,
+        tags: tags,
+        outline: outline,
+        images: images,
+        locked: true,
+        views: 0,
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        stars: 0
+      }
+      var result = await this.cl.insertOne(article)
+      if (result) {
+        return {
+          code: 0,
+          status: 200,
+          message: '发布成功',
+        }
+      }
+    }
+  }
 }
+
+
 
 export const Article = new ArticleServices()
