@@ -85,7 +85,14 @@ type SearchActionParams = {
     sort: string
     reverse: boolean
   }
-  searchArticleByTag: {
+  searchArticlesByAuthor: {
+    id: string
+    keyword: string
+    page: number
+    sort: string
+    reverse: boolean
+  }
+  searchArticlesByTag: {
     id: string
     keyword: string
     page: number
@@ -100,7 +107,8 @@ const searchActionParams: {
 } = {
   search: ['id', 'keyword', 'page', 'sort', 'reverse'],
   searchArticles: ['page', 'sort', 'reverse'],
-  searchArticleByTag: ['id', 'keyword', 'page', 'sort', 'reverse'],
+  searchArticlesByAuthor: ['page', 'sort', 'reverse'],
+  searchArticlesByTag: ['id', 'keyword', 'page', 'sort', 'reverse'],
   searchUser: ['id', 'keyword', 'page'],
 }
 
@@ -141,6 +149,19 @@ type ArticleActionParams = {
     outline: string
     images: Array<string>
   }
+  editArticle: {
+    userID: string
+    id: number
+    title: string
+    content: string
+    tags: Array<string>
+    outline: string
+    images: Array<string>
+  }
+  deleteArticle: {
+    userID: string;
+    id: number
+  }
 }
 
 const articleActionParams: {
@@ -154,6 +175,8 @@ const articleActionParams: {
   getCommentByID: ['articleID', 'commentID'],
   getReplies: ['articleID', 'commentID', 'page', 'sort'],
   publishArticle: ['id', 'title', 'content', 'tags', 'outline', 'images'],
+  editArticle: ['userID', 'id', 'title', 'content', 'tags', 'outline', 'images'],
+  deleteArticle: ['userID', 'id'],
 }
 
 // 参数验证函数
@@ -384,13 +407,50 @@ app.get('/search', async (req: Request, res: Response) => {
               }
               res.json(articles)
               break
-            case 'searchArticleByTag':
-              const articlesByTag = await Search.searchArticleByTag(
-                req.query.keyword as string,
-                Number(req.query.page),
-                req.query.sort as string,
-                JSON.parse(req.query.reverse as string) as boolean,
-              )
+            case 'searchArticlesByAuthor':
+              var token = await getToken(req)
+              var articles
+              if (token.ret) {
+                articles = await Search.searchArticlesByAuthor(
+                  req.query.keyword as string,
+                  Number(req.query.page),
+                  10,
+                  req.query.sort as string,
+                  JSON.parse(req.query.reverse as string) as boolean,
+                  String(req.query.id),
+                  token.token
+                )
+              } else {
+                articles = await Search.searchArticlesByAuthor(
+                  req.query.keyword as string,
+                  Number(req.query.page),
+                  10,
+                  req.query.sort as string,
+                  JSON.parse(req.query.reverse as string) as boolean
+                )
+              }
+              res.json(articles)
+              break
+            case 'searchArticlesByTag':
+              var token = await getToken(req)
+              var articlesByTag
+              if (token.ret) {
+                articlesByTag = await Search.searchArticlesByTag(
+                  req.query.keyword as string,
+                  Number(req.query.page),
+                  req.query.sort as string,
+                  JSON.parse(req.query.reverse as string) as boolean,
+                  String(req.query.id),
+                  token.token
+                )
+              } else {
+                articlesByTag = await Search.searchArticlesByTag(
+                  req.query.keyword as string,
+                  Number(req.query.page),
+                  req.query.sort as string,
+                  JSON.parse(req.query.reverse as string) as boolean,
+                )
+              }
               res.json(articlesByTag)
               break
             case 'searchUser':
@@ -517,6 +577,21 @@ app.get('/article', async (req: Request, res: Response) => {
         var token = await getToken(req)
         if (token.ret) {
           var result = await Article.publishArticle(req.query.id as string, token.token, req.query.title as string, req.query.content as string, JSON.parse(String(req.query.tags)), req.query.outline as string, JSON.parse(String(req.query.images)))
+          res.json(result)
+        }
+        break
+      case 'editArticle':
+        var token = await getToken(req)
+        if (token.ret) {
+          //editArticle(userID: string, token: string, id: number, title: string, content: string, tags: Array<string>, outline: string, images: Array<string>)
+          var result = await Article.editArticle(req.query.userID as string, token.token, Number(req.query.id), req.query.title as string, req.query.content as string, JSON.parse(String(req.query.tags)), req.query.outline as string, JSON.parse(String(req.query.images)))
+          res.json(result)
+        }
+        break
+      case 'deleteArticle':
+        var token = await getToken(req)
+        if (token.ret) {
+          var result = await Article.deleteArticle(req.query.userID as string, token.token, Number(req.query.id))
           res.json(result)
         }
         break

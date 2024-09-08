@@ -43,6 +43,7 @@ class ArticleServices {
           official: 1,
           selected: 1,
           locked: 1,
+          outline: 1,
           content: 1,
           images: 1,
           views: 1,
@@ -299,7 +300,16 @@ class ArticleServices {
     }
   }
 
-  async publishArticle(userID:string, token:string, title:string, content:string, tags:Array<string>, outline:string, images:Array<string>) {
+  async updateTag(tag: string) {
+    var result = await this.tags.findOne({ name: tag })
+    if (result) {
+      await this.tags.updateOne({ name: tag }, { $inc: { articles: 1 } })
+    } else {
+      await this.tags.insertOne({ name: tag, views: 0, articles: 1 })
+    }
+  }
+
+  async publishArticle(userID: string, token: string, title: string, content: string, tags: Array<string>, outline: string, images: Array<string>) {
     var valid = await Account.validateToken(userID, token)
     if (valid) {
       //获取文章总数
@@ -307,8 +317,8 @@ class ArticleServices {
       const article = {
         id: count + 1,
         author: userID,
-        publishDate: new Date(),
-        updateDate: new Date(),
+        publishDate: Date.now(),
+        updateDate: Date.now(),
         title: title,
         content: content,
         tags: tags,
@@ -321,8 +331,34 @@ class ArticleServices {
         shares: 0,
         stars: 0
       }
+
+      var lastUpdateTime = await Account.cl.findOne({
+        id: userID,
+      }, {
+        projection: {
+          _id: 0,
+          lastUpdateTime: 1,
+        },
+      })
+
+      //判断是否为1分钟内
+      if (lastUpdateTime.lastUpdateTime + 60000 > Date.now()) {
+        return {
+          code: 1,
+          status: 403,
+          message: '发布失败，请等待1分钟后再发布',
+        }
+      }
+
       var result = await this.cl.insertOne(article)
       if (result) {
+        Account.cl.updateOne(
+          { id: userID },
+          { $set: { lastUpdateTime: Date.now() } }
+        )
+        for (var tag of tags) {
+          this.updateTag(tag)
+        }
         return {
           code: 0,
           status: 200,
@@ -331,8 +367,126 @@ class ArticleServices {
       }
     }
   }
-}
 
+  async editArticle(userID: string, token: string, id: number, title: string, content: string, tags: Array<string>, outline: string, images: Array<string>) {
+    var valid = await Account.validateToken(userID, token)
+    if (valid) {
+
+      var lastUpdateTime = await Account.cl.findOne({
+        id: userID,
+      }, {
+        projection: {
+          _id: 0,
+          lastUpdateTime: 1,
+        },
+      })
+
+      //判断是否为1分钟内
+      if (lastUpdateTime.lastUpdateTime + 60000 > Date.now()) {
+        return {
+          code: 1,
+          status: 403,
+          message: '发布失败，请等待1分钟后再发布',
+        }
+      }
+
+      //获取原有tags
+      var oldTags = await this.cl.findOne({
+        id: id,
+      }, {
+        projection: {
+          _id: 0,
+          tags: 1,
+        },
+      })
+      var oldTagsArray = oldTags.tags
+      var newTagsArray = tags
+      //比对tags，如果旧tags被删除，则articles-1，如果有新tag，则updateTag
+      for (var tag of oldTagsArray) {
+        if (!newTagsArray.includes(tag)) {
+          await this.tags.updateOne({ name: tag }, { $inc: { articles: -1 } })
+        }
+      }
+
+      //修改文章
+      var result = await this.cl.updateOne(
+        { id: id },
+        {
+          $set: {
+            updateDate: Date.now(),
+            title: title,
+            content: content,
+            tags: tags,
+            outline: outline,
+            images: images,
+          },
+        }
+      )
+      if (result) {
+        for (var t of tags) {
+          this.updateTag(t)
+        }
+        Account.cl.updateOne(
+          { id: userID },
+          { $set: { lastUpdateTime: Date.now() } }
+        )
+        return {
+          code: 0,
+          status: 200,
+          message: '修改成功',
+        }
+      } else {
+        return {
+          code: 1,
+          status: 403,
+          message: '修改失败',
+        }
+      }
+    }
+  }
+
+  async deleteArticle(userID: string, token: string, id: number) {
+    var valid = await Account.validateToken(userID, token)
+    if (valid) {
+      //获取tags
+      var tags = await this.cl.findOne({
+        id: id,
+        author: userID,
+      }, {
+        projection: {
+          _id: 0,
+          tags: 1,
+        },
+      })
+      if (!tags) {
+        return {
+          code: 1,
+          status: 403,
+          message: '删除失败，文章不存在',
+        }
+      }
+      var tagsArray = tags.tags
+      //tags articles -1
+      for (var tag of tagsArray) {
+        this.tags.updateOne({ name: tag }, { $inc: { articles: -1 } })
+      }
+      var result = await this.cl.deleteOne({ id: id })
+      if (result) {
+        return {
+          code: 0,
+          status: 200,
+          message: '删除成功',
+        }
+      } else {
+        return {
+          code: 1,
+          status: 403,
+          message: '删除失败',
+        }
+      }
+    }
+  }
+}
 
 
 export const Article = new ArticleServices()

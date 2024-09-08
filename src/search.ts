@@ -59,11 +59,13 @@ class SearchService {
     return articles
   }
 
-  async searchArticleByTag(
+  async searchArticlesByTag(
     keyword: string,
     page: number,
     sort?: string,
     reverse?: boolean,
+    userID?: string,
+    token?: string,
   ) {
     const Sort = sort || 'hot'
     const Reverse = reverse || false
@@ -76,6 +78,7 @@ class SearchService {
     const skip = (page - 1) * limit
 
     const projection = {
+      _id: 0,
       id: 1,
       author: 1,
       publishDate: 1,
@@ -90,7 +93,7 @@ class SearchService {
       views: 1,
       likes: 1,
       comments: 1,
-      shares: 1,
+      stars: 1,
     }
 
     let sortField = ''
@@ -128,24 +131,29 @@ class SearchService {
       .sort({ [sortField]: sortOrder })
       .toArray()
 
-    //提取所有作者
-    const authors = articles.map((article: any) => article.author)
-    // 查询所有作者的用户信息
-    const users = await Account.cl
-      .find(
-        { id: { $in: authors } },
-        { projection: { id: 1, name: 1, qq: 1, _id: 0 } },
-      )
-      .toArray()
 
-    // 将用户信息添加到文章中
-    articles.forEach((article: any) => {
-      const user = users.find((user: any) => user.id === article.author)
-      if (user) {
-        article.name = user.name
-        article.head = `https://q1.qlogo.cn/g?b=qq&nk=${user.qq}&s=100`
+    var list = []
+    for (const article of articles) {
+      list.push(article.id)
+    }
+
+    if (userID && token) {
+      var likes = await Account.checkLikes(userID, token, list)
+    }
+
+    for (const article of articles) {
+      if (likes) {
+        if (likes.includes(article.id)) {
+          article.liked = true
+        }
       }
-    })
+      const author = await Account.getInfo(article.author)
+      if (author) {
+        article.head = `https://q1.qlogo.cn/g?b=qq&nk=${author.qq}&s=100`
+        article.name = author.name
+        article.isVIP = author.isVIP
+      }
+    }
 
     return articles
   }
@@ -235,6 +243,108 @@ class SearchService {
         .find(
           {
             // 省略 $or 条件，或者设置一个始终为真的条件
+          },
+          { projection: projection },
+        )
+        .skip(skip)
+        .limit(limit)
+        .sort({ [sortField]: sortOrder }) // 应用排序
+        .toArray();
+    }
+
+    var list = []
+    for (const article of articles) {
+      list.push(article.id)
+    }
+
+    if (userID && token) {
+      var likes = await Account.checkLikes(userID, token, list)
+    }
+
+    for (const article of articles) {
+      if (likes) {
+        if (likes.includes(article.id)) {
+          article.liked = true
+        }
+      }
+      const author = await Account.getInfo(article.author)
+      if (author) {
+        article.head = `https://q1.qlogo.cn/g?b=qq&nk=${author.qq}&s=100`
+        article.name = author.name
+        article.isVIP = author.isVIP
+      }
+    }
+    return articles
+  }
+
+  async searchArticlesByAuthor(
+    keyword: string,
+    page: number,
+    limit: number,
+    sort?: string,
+    reverse?: boolean,
+    userID?: string,
+    token?: string,
+  ) {
+    const skip = (page - 1) * limit
+
+    // 定义返回字段的投影
+    const projection = {
+      _id: 0,
+      id: 1,
+      author: 1,
+      publishDate: 1,
+      updateDate: 1,
+      title: 1,
+      tags: 1,
+      official: 1,
+      selected: 1,
+      locked: 1,
+      outline: 1,
+      images: 1,
+      views: 1,
+      likes: 1,
+      comments: 1,
+      stars: 1,
+    }
+
+    let sortField = ''
+    let sortOrder = 1 // 1 表示升序，-1 表示降序
+
+    if (sort === 'time') {
+      sortField = 'updateDate'
+    } else if (sort === 'hot') {
+      sortField = 'views'
+    } else {
+      sortField = 'hot' // 这里选择默认为按热度排序
+    }
+
+    // 根据reverse参数设置排序顺序
+    if (reverse) {
+      sortOrder = 1
+    } else {
+      sortOrder = -1
+    }
+
+    // 执行查询并应用投影，跳过和限制结果
+    var articles
+    if (keyword) {
+      articles = await Article.cl
+        .find(
+          {
+            author: keyword,
+          },
+          { projection: projection },
+        )
+        .skip(skip)
+        .limit(limit)
+        .sort({ [sortField]: sortOrder }) // 应用排序
+        .toArray()
+    } else {
+      articles = await Article.cl
+        .find(
+          {
+
           },
           { projection: projection },
         )
