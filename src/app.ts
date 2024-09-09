@@ -8,7 +8,7 @@ import { Article } from './article'
 import { Content } from './content'
 
 const app = express()
-const port = 3000
+const port = 3001
 async function getToken(
   req: Request,
 ): Promise<{ ret: true; token: string } | { ret: false; message: string }> {
